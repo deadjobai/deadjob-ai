@@ -50,9 +50,15 @@ const T = {
     sponsored: '⭐ Gesponserte Empfehlung', sponsoredBadge: 'GESPONSERT',
     sponsoredCta: 'Jetzt ansehen →',
     sponsoredDisclaimer: 'Gesponserte Inhalte — von Kursanbietern bezahlt',
-    share: '📋 Für Social Media kopieren', copied: '✓ Kopiert — jetzt posten!',
+    share: '📋 Teilen & Link kopieren', copied: '✓ Link kopiert!',
+    shareLink: '🔗 Direktlink zu diesem Ergebnis',
+    linkCopied: '✓ Link kopiert!',
     newSearch: '↩ Neue Analyse', sectorL: 'Sektor', ageL: 'Alter', expL: 'Erfahrung',
     back: '←', shareTitle: 'Teile dein Ergebnis', copyTerm: 'kopieren', termCopied: '✓',
+    statsTitle: '🔥 Die risikoreichsten Jobs laut unseren Nutzern',
+    statsSubtitle: 'Live-Auswertung aller Analysen',
+    statsSearches: 'Analysen',
+    statsRisk: 'Ø Risiko',
   },
   en: {
     tagline: 'Will AI take your job? Find out in 10 seconds.',
@@ -69,26 +75,36 @@ const T = {
     sponsored: '⭐ Sponsored recommendation', sponsoredBadge: 'SPONSORED',
     sponsoredCta: 'View now →',
     sponsoredDisclaimer: 'Sponsored content — paid by course providers',
-    share: '📋 Copy for Social Media', copied: '✓ Copied — go post it!',
+    share: '📋 Share & copy link', copied: '✓ Link copied!',
+    shareLink: '🔗 Direct link to this result',
+    linkCopied: '✓ Link copied!',
     newSearch: '↩ New analysis', sectorL: 'Sector', ageL: 'Age', expL: 'Experience',
     back: '←', shareTitle: 'Share your result', copyTerm: 'copy', termCopied: '✓',
+    statsTitle: '🔥 Most at-risk jobs according to our users',
+    statsSubtitle: 'Live analysis of all results',
+    statsSearches: 'analyses',
+    statsRisk: 'Avg risk',
   },
 };
 
 const riskColor = (s: number) => s >= 70 ? '#ef4444' : s >= 40 ? '#f59e0b' : '#34d399';
 
-const generateShareText = (result: any, lang: 'de' | 'en') => {
+// Schärferer Share-Text
+const generateShareText = (result: any, lang: 'de' | 'en', shareUrl: string) => {
   const score = result.risk_score;
   const job = result.job;
   const year = result.critical_year || '2030';
+
   if (lang === 'de') {
-    if (score >= 80) return `Mein Job als ${job} wird zu ${score}% von KI übernommen. 🤖\nDie gute Nachricht: Ich hab noch bis ${year}.\nDie schlechte: Das dachten Schriftsetzer auch.\n\nWie steht's um deinen? → deadjob.ai`;
-    if (score >= 50) return `KI-Risiko für meinen Job als ${job}: ${score}%. 🤔\nHalb Mensch, halb Algorithmus — ich nenn's Hybrid-Karriere.\n\nWas sagt die KI über deinen Job? → deadjob.ai`;
-    return `KI-Risiko für meinen Job als ${job}: nur ${score}%. 😎\nManche Jobs sind eben KI-immun. Meiner (fast).\n\nBist du auch sicher? → deadjob.ai`;
+    if (score >= 75) return `Mein Job als ${job} stirbt ${year}.\nKI übernimmt ${score}% meiner Aufgaben — laut deadjob.ai\n\nWas ist dein Score? → ${shareUrl}`;
+    if (score >= 50) return `${score}% meines Jobs als ${job} macht bald die KI.\nNoch bin ich da — aber die Uhr tickt. ⏳\n\nCHECK DEINEN JOB → ${shareUrl}`;
+    if (score >= 25) return `Nur ${score}% KI-Risiko als ${job}.\nFast KI-proof — fast. 😅\n\nBist du sicherer? → ${shareUrl}`;
+    return `KI-PROOF! Nur ${score}% Automatisierungsrisiko als ${job}. 💪\nManche Jobs überlebt man eben.\n\nCheck deinen → ${shareUrl}`;
   } else {
-    if (score >= 80) return `My job as ${job} has a ${score}% AI takeover risk. 🤖\nGood news: I have until ${year}.\nBad news: That's what typesetters thought too.\n\nCheck yours → deadjob.ai`;
-    if (score >= 50) return `AI risk for my ${job} job: ${score}%. 🤔\nHalf human, half algorithm — I call it a hybrid career.\n\nCheck your job → deadjob.ai`;
-    return `AI risk for my ${job} job: just ${score}%. 😎\nTurns out some jobs are basically AI-proof. Mine (almost).\n\nAre you safe too? → deadjob.ai`;
+    if (score >= 75) return `My job as ${job} dies in ${year}.\nAI takes over ${score}% of my work — according to deadjob.ai\n\nWhat's your score? → ${shareUrl}`;
+    if (score >= 50) return `${score}% of my ${job} job will soon be done by AI.\nStill here for now — but the clock is ticking. ⏳\n\nCHECK YOUR JOB → ${shareUrl}`;
+    if (score >= 25) return `Only ${score}% AI risk as a ${job}.\nAlmost AI-proof — almost. 😅\n\nAre you safer? → ${shareUrl}`;
+    return `AI-PROOF! Only ${score}% automation risk as a ${job}. 💪\nSome jobs just survive.\n\nCheck yours → ${shareUrl}`;
   }
 };
 
@@ -96,22 +112,16 @@ function LoadingAnimation({ lang }: { lang: 'de' | 'en' }) {
   const [msgIndex, setMsgIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const messages = LOADING_MESSAGES[lang];
-
   useEffect(() => {
-    const progressInterval = setInterval(() => {
-      setProgress(prev => prev >= 90 ? prev : prev + (90 - prev) * 0.04);
-    }, 200);
-    const msgInterval = setInterval(() => {
-      setMsgIndex(prev => (prev + 1) % messages.length);
-    }, 3000);
-    return () => { clearInterval(progressInterval); clearInterval(msgInterval); };
+    const pi = setInterval(() => setProgress(p => p >= 90 ? p : p + (90 - p) * 0.04), 200);
+    const mi = setInterval(() => setMsgIndex(p => (p + 1) % messages.length), 3000);
+    return () => { clearInterval(pi); clearInterval(mi); };
   }, [messages.length]);
-
   return (
     <div style={{ marginTop: 24, padding: '20px 0' }}>
       <style>{`
-        @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.15);opacity:0.7} }
-        @keyframes dotBounce { 0%,80%,100%{transform:translateY(0);opacity:0.3} 40%{transform:translateY(-6px);opacity:1} }
+        @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.15);opacity:0.7}}
+        @keyframes dotBounce{0%,80%,100%{transform:translateY(0);opacity:0.3}40%{transform:translateY(-6px);opacity:1}}
         .pulse-icon{animation:pulse 1.5s ease-in-out infinite;display:inline-block}
         .dot1{animation:dotBounce 1.2s ease-in-out infinite 0s}
         .dot2{animation:dotBounce 1.2s ease-in-out infinite 0.2s}
@@ -134,39 +144,50 @@ function LoadingAnimation({ lang }: { lang: 'de' | 'en' }) {
   );
 }
 
+// Stats Component
+function StatsSection({ lang }: { lang: 'de' | 'en' }) {
+  const [stats, setStats] = useState<any[]>([]);
+  const t = T[lang];
 
-// Footer Component
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(d => setStats(d.stats || []))
+      .catch(() => {});
+  }, []);
+
+  if (stats.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 40, background: '#0d1117', border: '1px solid #1e2535', borderRadius: 16, padding: 24 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{t.statsTitle}</div>
+      <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 16 }}>{t.statsSubtitle}</div>
+      {stats.map((s: any, i: number) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, padding: '10px 12px', background: '#080b14', borderRadius: 8 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: '#4b5563', minWidth: 24 }}>#{i + 1}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', textTransform: 'capitalize' }}>{s.job_normalized}</div>
+            <div style={{ fontSize: 11, color: '#4b5563' }}>{s.count} {t.statsSearches}</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 20, fontWeight: 900, color: riskColor(Math.round(s.avg_risk)) }}>{Math.round(s.avg_risk)}%</div>
+            <div style={{ fontSize: 10, color: '#4b5563' }}>{t.statsRisk}</div>
+          </div>
+          <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#1a1f2e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: `conic-gradient(${riskColor(Math.round(s.avg_risk))} ${Math.round(s.avg_risk)}%, #1e2535 0)` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Footer({ lang }: { lang: 'de' | 'en' }) {
   return (
-    <footer style={{
-      maxWidth: 620,
-      margin: '40px auto 0',
-      padding: '20px 16px',
-      borderTop: '1px solid #1e2535',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      flexWrap: 'wrap' as const,
-      gap: 12,
-    }}>
-      <span style={{ fontSize: 12, color: '#4b5563' }}>
-        © 2026 dead<span style={{ color: '#6366f1' }}>job</span>.ai
-      </span>
-      <a
-        href="mailto:contact@deadjob.ai"
-        style={{
-          fontSize: 12,
-          color: '#6b7280',
-          textDecoration: 'none',
-          background: '#0d1117',
-          border: '1px solid #1e2535',
-          borderRadius: 8,
-          padding: '6px 14px',
-        }}
-      >
-        {lang === 'de'
-          ? '✉ Kontakt'
-          : '✉ Contact'}
+    <footer style={{ maxWidth: 620, margin: '40px auto 0', padding: '20px 16px', borderTop: '1px solid #1e2535', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' as const, gap: 12 }}>
+      <span style={{ fontSize: 12, color: '#4b5563' }}>© 2026 dead<span style={{ color: '#6366f1' }}>job</span>.ai</span>
+      <a href="mailto:contact@deadjob.ai" style={{ fontSize: 12, color: '#6b7280', textDecoration: 'none', background: '#0d1117', border: '1px solid #1e2535', borderRadius: 8, padding: '6px 14px' }}>
+        {lang === 'de' ? '✉ Kontakt' : '✉ Contact'}
       </a>
     </footer>
   );
@@ -182,8 +203,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [copiedTerms, setCopiedTerms] = useState<Record<number, boolean>>({});
   const [shareText, setShareText] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
   const [trainingOpen, setTrainingOpen] = useState(false);
 
   useEffect(() => {
@@ -205,8 +228,10 @@ export default function Home() {
         body: JSON.stringify({ job, sector, age, exp, lang }),
       });
       const data = await res.json();
+      const url = `${window.location.origin}/s/${data.shareId}`;
+      setShareUrl(url);
       setResult(data);
-      setShareText(generateShareText(data, lang));
+      setShareText(generateShareText(data, lang, url));
       setStep(3);
     } catch { console.error('Analysis failed'); }
     setLoading(false);
@@ -221,7 +246,7 @@ export default function Home() {
   const reset = () => {
     setStep(1); setJob(''); setSector(''); setAge('');
     setExp(''); setResult(null); setCopied(false);
-    setCopiedTerms({}); setTrainingOpen(false);
+    setCopiedTerms({}); setTrainingOpen(false); setShareUrl('');
   };
 
   const optBtn = (val: string, cur: string, set: (v: string) => void, label: string, minW = 80) => (
@@ -234,31 +259,20 @@ export default function Home() {
     }}>{label}</button>
   );
 
-  const card: React.CSSProperties = {
-    background: '#0d1117', border: '1px solid #1e2535',
-    borderRadius: 16, padding: 'clamp(16px, 4vw, 24px)',
-  };
+  const card: React.CSSProperties = { background: '#0d1117', border: '1px solid #1e2535', borderRadius: 16, padding: 'clamp(16px, 4vw, 24px)' };
 
   return (
     <main style={{ minHeight: '100vh', background: '#080b14', color: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', padding: '24px 16px' }}>
       <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .training-panel { animation: slideDown 0.25s ease; }
+        @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+        .training-panel{animation:slideDown 0.25s ease}
       `}</style>
       <div style={{ maxWidth: 620, margin: '0 auto' }}>
 
         {/* Lang */}
         <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 20 }}>
           {(['de', 'en'] as const).map(l => (
-            <button key={l} onClick={() => setLang(l)} style={{
-              padding: '4px 16px', borderRadius: 6, border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: 600,
-              background: lang === l ? '#6366f1' : '#1a1f2e',
-              color: lang === l ? '#fff' : '#6b7280',
-            }}>{l.toUpperCase()}</button>
+            <button key={l} onClick={() => setLang(l)} style={{ padding: '4px 16px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: lang === l ? '#6366f1' : '#1a1f2e', color: lang === l ? '#fff' : '#6b7280' }}>{l.toUpperCase()}</button>
           ))}
         </div>
 
@@ -287,6 +301,7 @@ export default function Home() {
                 <button key={p} onClick={() => { setJob(p); setStep(2); }} style={{ background: '#0f1420', border: '1px solid #1e2535', borderRadius: 20, padding: '5px 12px', fontSize: 'clamp(11px, 2.5vw, 12px)', color: '#6b7280', cursor: 'pointer' }}>{p}</button>
               ))}
             </div>
+            <StatsSection lang={lang} />
           </div>
         )}
 
@@ -396,48 +411,35 @@ export default function Home() {
               )}
             </div>
 
-            {/* TRAINING TOGGLE BUTTON */}
+            {/* Training toggle */}
             {(result.training?.length > 0 || result.sponsoredCourse) && (
-              <button
-                onClick={() => setTrainingOpen(!trainingOpen)}
-                style={{
-                  width: '100%', border: `1px solid ${trainingOpen ? '#fbbf24' : '#1e2535'}`,
-                  borderRadius: 10, padding: '14px 16px', marginBottom: trainingOpen ? 0 : 16,
-                  fontSize: 'clamp(13px, 3vw, 14px)', fontWeight: 600, cursor: 'pointer',
-                  background: trainingOpen ? '#1a130a' : '#080b14',
-                  color: trainingOpen ? '#fbbf24' : '#9ca3af',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  borderBottomLeftRadius: trainingOpen ? 0 : 10,
-                  borderBottomRightRadius: trainingOpen ? 0 : 10,
-                }}
-              >
+              <button onClick={() => setTrainingOpen(!trainingOpen)} style={{
+                width: '100%', border: `1px solid ${trainingOpen ? '#fbbf24' : '#1e2535'}`,
+                borderRadius: 10, borderBottomLeftRadius: trainingOpen ? 0 : 10,
+                borderBottomRightRadius: trainingOpen ? 0 : 10,
+                padding: '14px 16px', marginBottom: trainingOpen ? 0 : 16,
+                fontSize: 'clamp(13px, 3vw, 14px)', fontWeight: 600, cursor: 'pointer',
+                background: trainingOpen ? '#1a130a' : '#080b14',
+                color: trainingOpen ? '#fbbf24' : '#9ca3af',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
                 <span>{trainingOpen ? t.trainingToggleClose : t.trainingToggle}</span>
                 <span style={{ fontSize: 16, transform: trainingOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>▼</span>
               </button>
             )}
 
-            {/* TRAINING PANEL — ausgeklappt */}
             {trainingOpen && (
-              <div className="training-panel" style={{
-                background: '#080b14',
-                border: '1px solid #fbbf24',
-                borderTop: 'none',
-                borderRadius: '0 0 12px 12px',
-                padding: 16,
-                marginBottom: 16,
-              }}>
-
-                {/* Sponsored — nur wenn vorhanden */}
+              <div className="training-panel" style={{ background: '#080b14', border: '1px solid #fbbf24', borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 16, marginBottom: 16 }}>
                 {result.sponsoredCourse && (
                   <div style={{ background: '#0a0f1a', border: '1px solid #2d2a1e', borderRadius: 10, padding: 14, marginBottom: 14 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: '#fbbf24' }}>{t.sponsored}</div>
-                      <span style={{ fontSize: 9, background: '#2d2a1e', color: '#92400e', border: '1px solid #92400e', borderRadius: 4, padding: '2px 6px', letterSpacing: '0.5px' }}>{t.sponsoredBadge}</span>
+                      <span style={{ fontSize: 9, background: '#2d2a1e', color: '#92400e', border: '1px solid #92400e', borderRadius: 4, padding: '2px 6px' }}>{t.sponsoredBadge}</span>
                     </div>
                     <div style={{ fontSize: 'clamp(14px, 3vw, 15px)', fontWeight: 700, color: '#fff', marginBottom: 4 }}>{result.sponsoredCourse.course_title}</div>
                     <div style={{ fontSize: 12, color: '#fbbf24', marginBottom: 8 }}>{result.sponsoredCourse.provider_name}</div>
                     {result.sponsoredCourse.description && (
-                      <div style={{ fontSize: 'clamp(12px, 2.5vw, 13px)', color: '#9ca3af', lineHeight: 1.5, marginBottom: 12 }}>{result.sponsoredCourse.description}</div>
+                      <div style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.5, marginBottom: 12 }}>{result.sponsoredCourse.description}</div>
                     )}
                     <a href={result.sponsoredCourse.url} target="_blank" rel="noopener noreferrer"
                       style={{ display: 'inline-block', background: '#fbbf24', color: '#000', borderRadius: 8, padding: '10px 20px', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>
@@ -446,8 +448,6 @@ export default function Home() {
                     <div style={{ fontSize: 10, color: '#4b5563', marginTop: 8 }}>{t.sponsoredDisclaimer}</div>
                   </div>
                 )}
-
-                {/* Organic training */}
                 {result.training?.length > 0 && (
                   <>
                     <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10 }}>{t.trainingHint}</div>
@@ -457,17 +457,12 @@ export default function Home() {
                         <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8, padding: '10px 12px', background: '#0d1117', borderRadius: 8, border: '1px solid #1e2535' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 'clamp(12px, 2.5vw, 13px)', fontWeight: 600, color: '#e5e7eb' }}>🔍 {item.term}</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: '#e5e7eb' }}>🔍 {item.term}</span>
                               <span style={{ fontSize: 10, background: '#1a1f2e', border: `1px solid ${platformColor}`, color: platformColor, borderRadius: 20, padding: '2px 8px' }}>{item.platform}</span>
                             </div>
                             <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4 }}>{item.why}</div>
                           </div>
-                          <button onClick={() => copyTerm(item.term, i)} style={{
-                            background: copiedTerms[i] ? '#0a2a0a' : '#1a1f2e',
-                            color: copiedTerms[i] ? '#34d399' : '#6b7280',
-                            border: '1px solid #1e2535', borderRadius: 6,
-                            padding: '4px 10px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                          }}>
+                          <button onClick={() => copyTerm(item.term, i)} style={{ background: copiedTerms[i] ? '#0a2a0a' : '#1a1f2e', color: copiedTerms[i] ? '#34d399' : '#6b7280', border: '1px solid #1e2535', borderRadius: 6, padding: '4px 10px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
                             {copiedTerms[i] ? t.termCopied : t.copyTerm}
                           </button>
                         </div>
@@ -492,9 +487,27 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Share */}
+            {/* Share Box */}
             <div style={{ background: '#080b14', border: '1px solid #1e2535', borderRadius: 12, padding: 16, marginBottom: 10 }}>
               <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>✨ {t.shareTitle}</div>
+
+              {/* Direct link */}
+              {shareUrl && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+                  <div style={{ flex: 1, background: '#0d1117', border: '1px solid #1e2535', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#6366f1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {shareUrl}
+                  </div>
+                  <button onClick={() => {
+                    navigator.clipboard.writeText(shareUrl);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2500);
+                  }} style={{ background: linkCopied ? '#0a2a0a' : '#1a1f2e', color: linkCopied ? '#34d399' : '#6b7280', border: '1px solid #1e2535', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {linkCopied ? '✓' : '🔗'}
+                  </button>
+                </div>
+              )}
+
+              {/* Share text */}
               <div style={{ background: '#0d1117', borderRadius: 8, padding: 12, fontSize: 'clamp(12px, 2.5vw, 13px)', color: '#9ca3af', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginBottom: 12, border: '1px solid #1e2535' }}>
                 {shareText}
               </div>

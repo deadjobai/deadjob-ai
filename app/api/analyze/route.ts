@@ -3,11 +3,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SECRET_KEY!
 );
+
+function generateShareId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
 export async function POST(req: NextRequest) {
   const { job, sector, age, exp, lang, session_id } = await req.json();
@@ -18,19 +22,18 @@ export async function POST(req: NextRequest) {
   const ua = req.headers.get('user-agent') || '';
   const device_type = /mobile|android|iphone|ipad/i.test(ua) ? 'mobile' : 'desktop';
   const referrer = req.headers.get('referer') || 'direct';
-  const getRiskCategory = (score: number) =>
-    score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
+  const getRiskCategory = (score: number) => score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low';
 
   const sectorContext = {
     private: lang === 'de'
       ? 'Privatwirtschaft: hoher Kostendruck, schnelle KI-Adoption, direktes Automatisierungsrisiko'
       : 'Private sector: high cost pressure, fast AI adoption, direct automation risk',
     public: lang === 'de'
-      ? 'Öffentlicher Dienst: Beamtenschutz, langsamere Automatisierung (5-10 Jahre Verzögerung), aber wachsender Digitalisierungsdruck'
-      : 'Public sector: civil servant protection, slower automation (5-10 year delay), but growing digitalization pressure',
+      ? 'Öffentlicher Dienst: Beamtenschutz, langsamere Automatisierung (5-10 Jahre Verzögerung)'
+      : 'Public sector: civil servant protection, slower automation (5-10 year delay)',
     self: lang === 'de'
-      ? 'Selbstständig: direkter Wettbewerb mit KI-Tools, aber Chance zur Neupositionierung als KI-gestützter Spezialist'
-      : 'Self-employed: direct competition with AI tools, but opportunity to reposition as AI-powered specialist',
+      ? 'Selbstständig: direkter Wettbewerb mit KI-Tools, aber Chance zur Neupositionierung'
+      : 'Self-employed: direct competition with AI tools, opportunity to reposition',
   }[sector as string] ?? '';
 
   const prompt = lang === 'de'
@@ -44,9 +47,6 @@ Wichtige Regeln:
 - Alter 55+: Empfehlung auf KI-Tool-Nutzung fokussiert, KEINE komplette Umschulung
 - Alter 18-35: mutige neue Berufsbilder empfehlen
 - Alter 36-54: gezielte Weiterbildung und Hybridrolle
-- Selbstständig: Differenzierung und Premiumpositionierung
-
-Bei den Weiterbildungen: Gib KONKRETE Suchbegriffe die jemand bei Google, Udemy, LinkedIn Learning oder dem AMS eingeben kann.
 
 Antworte NUR mit einem JSON-Objekt, kein Text davor oder danach, keine Backticks:
 {
@@ -66,7 +66,7 @@ Antworte NUR mit einem JSON-Objekt, kein Text davor oder danach, keine Backticks
   "recommendation": "<Konkrete altersgerechte Empfehlung>",
   "new_roles": ["<Jobtitel 1>", "<Jobtitel 2>", "<Jobtitel 3>"],
   "training": [
-    {"term": "<konkreter Suchbegriff>", "platform": "<Udemy/LinkedIn/AMS/WKO/Google>", "why": "<1 Satz warum>"},
+    {"term": "<Suchbegriff>", "platform": "<Udemy/LinkedIn/AMS/WKO/Google>", "why": "<1 Satz>"},
     {"term": "<Suchbegriff 2>", "platform": "<Plattform>", "why": "<warum>"},
     {"term": "<Suchbegriff 3>", "platform": "<Plattform>", "why": "<warum>"},
     {"term": "<Suchbegriff 4>", "platform": "<Plattform>", "why": "<warum>"},
@@ -83,8 +83,6 @@ Rules:
 - Age 55+: focus on AI tool usage, NO complete retraining
 - Age 18-35: boldly name new job profiles
 - Age 36-54: targeted upskilling and hybrid roles
-
-For training: CONCRETE search terms for Google, Udemy, LinkedIn Learning or Coursera.
 
 Reply ONLY with JSON, no text before or after, no backticks:
 {
@@ -132,27 +130,19 @@ Reply ONLY with JSON, no text before or after, no backticks:
       .eq('language', lang || 'de');
 
     let sponsoredCourse = null;
-    if (sponsoredData && sponsoredData.length > 0) {
+    if (sponsoredData?.length > 0) {
       for (const course of sponsoredData) {
-        // Country check: ALL = immer, sonst nur wenn country im country_codes
         const countryCodes = (course.country_codes || 'ALL').toUpperCase();
-        const countryMatch =
-          countryCodes === 'ALL' ||
-          country === 'unknown' ||
+        const countryMatch = countryCodes === 'ALL' || country === 'unknown' ||
           countryCodes.split(',').map((c: string) => c.trim()).includes(country.toUpperCase());
-
         if (!countryMatch) continue;
-
-        // Keyword check
         const keywords = course.job_keywords.toLowerCase().split(',').map((k: string) => k.trim());
         const keywordMatch = keywords.some((kw: string) =>
           jobLower.includes(kw) || kw.includes(jobLower.split(' ')[0])
         );
-
         if (keywordMatch) {
           sponsoredCourse = course;
-          await supabase
-            .from('sponsored_courses')
+          await supabase.from('sponsored_courses')
             .update({ display_count: (course.display_count || 0) + 1 })
             .eq('id', course.id);
           break;
@@ -160,7 +150,10 @@ Reply ONLY with JSON, no text before or after, no backticks:
       }
     }
 
-    // Statistik speichern
+    // Share ID generieren
+    const shareId = generateShareId();
+
+    // In Supabase speichern mit share_id
     const { error: dbError } = await supabase.from('job_analyses').insert({
       job_normalized: job.toLowerCase().trim(),
       job_original: job.trim(),
@@ -176,15 +169,17 @@ Reply ONLY with JSON, no text before or after, no backticks:
       referrer: referrer.substring(0, 200),
       shared: false,
       session_id: session_id || null,
+      share_id: shareId,
+      is_public: true,
     });
 
     if (dbError) {
       console.error('SUPABASE ERROR:', JSON.stringify(dbError));
     } else {
-      console.log(`SUPABASE OK: ${job} | Score: ${parsed.risk_score} | ${country} | ${device_type}`);
+      console.log(`SUPABASE OK: ${job} | Score: ${parsed.risk_score} | ShareID: ${shareId}`);
     }
 
-    return NextResponse.json({ ...parsed, sponsoredCourse });
+    return NextResponse.json({ ...parsed, shareId, sponsoredCourse });
   } catch (e) {
     console.error('GENERAL ERROR:', e);
     return NextResponse.json({ error: 'Analysis failed' }, { status: 500 });
