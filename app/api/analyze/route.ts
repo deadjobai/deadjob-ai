@@ -130,8 +130,8 @@ Reply ONLY with JSON, no text before or after, no backticks:
       .eq('language', lang || 'de');
 
     let sponsoredCourse = null;
-    if (sponsoredData?.length > 0) {
-      for (const course of sponsoredData) {
+if (sponsoredData && sponsoredData.length > 0) {
+  for (const course of (sponsoredData as any[])) {
         const countryCodes = (course.country_codes || 'ALL').toUpperCase();
         const countryMatch = countryCodes === 'ALL' || country === 'unknown' ||
           countryCodes.split(',').map((c: string) => c.trim()).includes(country.toUpperCase());
