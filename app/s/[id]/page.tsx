@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -14,11 +15,12 @@ const riskLabel = (s: number, lang: string) => {
   return s >= 70 ? 'High risk' : s >= 40 ? 'Medium risk' : 'Low risk';
 };
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data } = await supabase
     .from('job_analyses')
     .select('job_original, risk_score, language')
-    .eq('share_id', params.id)
+    .eq('share_id', id)
     .single();
 
   if (!data) return { title: 'deadjob.ai' };
@@ -29,16 +31,17 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
     openGraph: {
       title: `${data.job_original} — ${data.risk_score}% KI-Übernahmerisiko`,
       description: `Analysiert mit deadjob.ai`,
-      url: `https://deadjob.ai/s/${params.id}`,
+      url: `https://deadjob.ai/s/${id}`,
     },
   };
 }
 
-export default async function SharePage({ params }: { params: { id: string } }) {
+export default async function SharePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data } = await supabase
     .from('job_analyses')
     .select('*')
-    .eq('share_id', params.id)
+    .eq('share_id', id)
     .eq('is_public', true)
     .single();
 
